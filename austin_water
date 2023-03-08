@@ -1,5 +1,8 @@
 # Water Quality Case Study: pH and water temperature
 ## data from data.austintexas.gov
+## This is a guided project via LinkedIn Learning for RStudio. Having recently received my certification in 
+## Google Data Analytics, I need more opportunities to explore all that R can accomplish and how it can be
+## a valuable asset in my future as an analyst.  
 
 ### load packages
 library(tidyverse)
