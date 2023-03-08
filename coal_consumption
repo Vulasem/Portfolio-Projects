@@ -1,0 +1,102 @@
+# Case Study: Coal Consumption
+## This case study was via LinkedIn Learning for RStudio to give me extra practice.
+## It is not intended to be a deep-dive into the data. 
+
+
+## After previewing the excel file `coal` there are many things we need to do to 
+## clean the data.  Column1 has countries, continents and the world mixed together.
+## There is a blank row beneath the header/title
+## 
+
+## load packages and dataset
+## 
+library(tidyverse)
+coal <- read_csv('http://594442.youcanlearnit.net/coal.csv')
+
+glimpse(coal) ## There was an issue on import! Column names did not carry over
+              ## reviewing the csv shows there is a blank row causing the issue
+
+coal <- read_csv('http://594442.youcanlearnit.net/coal.csv',
+                 skip=2)
+glimpse(coal) ## better - there are rows for each year and columns for each area
+              ## row 1 was named `X1` and needs to be fixed
+
+colnames(coal)[1] <- "region"
+summary(coal) ## rows and columns look better! Values are all character...
+
+## first let's transform from wide data to long data
+
+?pivot_longer() # `pivot_longer(data,columns,names,values)`
+
+coal_long <- pivot_longer(coal, !region, names_to = 'year', values_to = 'coal_consumption' )
+glimpse(coal_long)
+
+
+## converting from character to integer
+
+coal_long <- coal_long %>% 
+  mutate(year=as.integer(year))
+
+summary(coal_long)
+
+coal_long <- coal_long %>% 
+  mutate(coal_consumption=as.numeric(coal_consumption))
+
+summary(coal_long) ## 517 NAs
+
+## Region wrangling - includes countries, continents and world. Let's break it apart
+
+unique(coal_long$region) ## let's create vector for continents NOT countries!
+
+coal_continent <- c('Antarctica','Central & South America','Middle East','Africa',
+                    'North America','Europe','Eurasia','Asia & Oceania')
+world <- c('World')
+
+
+coal_region <- coal_long %>% 
+  filter(region %in% coal_continent) ## all data broken into continents
+
+coal_country <- coal_long %>% 
+  filter(!(region %in% coal_continent)) ## data broken into countries
+
+coal_world <- coal_long %>% 
+  filter(region %in% world) ## world overview data
+
+unique(coal_region$region)
+unique(coal_country$region)
+unique(coal_world$region)
+
+
+## Let's see some insights with ggplot2
+### Region
+
+ggplot(coal_region, mapping = aes(year,coal_consumption))+
+  geom_point() ## basic plot
+
+ggplot(coal_region, mapping = aes(year,coal_consumption))+
+  geom_line() ## messy lines
+
+ggplot(coal_region, mapping = aes(year,coal_consumption))+
+  geom_line(mapping = aes(color=region)) ## separate lines per country
+
+### Country
+
+ggplot(coal_country, mapping = aes(year,coal_consumption))+
+  geom_line() ## messy
+
+ggplot(coal_country, mapping = aes(year,coal_consumption))+
+  geom_line(mapping = aes(color=region)) ## plot doesn't show due to legend
+
+ggplot(coal_country, mapping = aes(year,coal_consumption))+
+  geom_jitter() ## plot doesn't show due to legend
+
+### World
+
+ggplot(coal_world, mapping = aes(year,coal_consumption))+
+  geom_smooth()
+
+
+
+
+
+
