@@ -1,0 +1,192 @@
+# Water Quality Case Study: pH and water temperature
+## data from data.austintexas.gov
+
+### load packages
+library(tidyverse)
+library(lubridate)
+
+### import dataset
+water <- read_csv('http://594442.youcanlearnit.net/austinwater.csv')
+
+### overview data
+
+glimpse(water)
+
+### filtering data we need
+
+water <- water %>% 
+  select(SITE_NAME, SITE_TYPE, SAMPLE_DATE, PARAM_TYPE, PARAMETER, RESULT, UNIT)
+
+glimpse(water) ## stop shouting! 
+
+water <- water %>% 
+  rename(siteName=SITE_NAME, siteType=SITE_TYPE, sampleDate=SAMPLE_DATE,
+         paramType=PARAM_TYPE, parameter=PARAMETER,result=RESULT,unit=UNIT)
+glimpse(water)
+
+### looking for pH and temperature parameters only
+
+unique(water$parameter) ## more than 1000 parameter values to sort through!
+
+water %>% 
+  filter(str_detect(parameter, 'PH')) %>% 
+  select(parameter) %>% 
+  unique() ## pulling every variable with 'ph' in the name...
+
+### too many in `parameters` lets check `paramType`
+
+unique(water$paramType) ## alkalinity/hardness/ph and conventional maybe?
+
+filtered_water <- water %>% 
+  filter(paramType == 'Alkalinity/Hardness/pH' | 
+           paramType == 'Conventionals')
+
+glimpse(filtered_water)
+
+unique(filtered_water$parameter)
+
+### success!
+
+filtered_water <- water %>% 
+  filter(parameter == 'PH' |
+           parameter == 'WATER TEMPERATURE')
+
+glimpse(filtered_water)
+unique(filtered_water$parameter) ### only PH and Temp!
+
+### overview of filtered_water
+
+summary(filtered_water) ## a lot of characters. looking for factors and numerics
+
+unique(filtered_water$siteType)
+
+filtered_water <- filtered_water %>% 
+  mutate(siteType=as.factor(siteType))
+
+summary(filtered_water) ## success!
+
+filtered_water <- filtered_water %>% 
+  mutate(paramType=as.factor(paramType))
+
+## Easier way:
+
+filtered_water <- filtered_water %>% 
+  mutate(siteType=as.factor(siteType),
+         paramType=as.factor(paramType),
+         unit=as.factor(unit)) ## added unit as factor type (categorical)
+
+summary(filtered_water)
+
+filtered_water$sampleDate
+
+## lubridate to convert from character to date
+
+filtered_water <- filtered_water %>% 
+  mutate(sampleDate=mdy_hms(sampleDate))
+
+summary(filtered_water)
+
+## Correcting data errors
+## unit measurements include both Celsius and Fahrenheit units...as well as 
+## feet and volume measures
+
+filtered_water %>% 
+  filter(unit == 'Feet') ## likely recorded as `ft` instead of `F` for fahrenheit
+
+filtered_water <- filtered_water %>% 
+  mutate(unit=recode(unit, 'Feet'= 'Deg. Fahrenheit'))
+
+summary(filtered_water)
+
+filtered_water <- filtered_water %>% 
+  filter(!unit == 'MG/L') ## unsure how to proceed, will remove 7 rows
+
+summary(filtered_water) ## MG/L shows as 0. will drop level
+
+filtered_water <- filtered_water %>% 
+  mutate(unit=droplevels(unit))  ## perfect
+
+## Have 2 different temperature readings. Lets get them consistent.
+## there are more in C
+
+fahrenheit <- which(filtered_water$unit=='Deg. Fahrenheit') ## `which()` gives array of rows that
+                                              ## contain Deg. Fah. values
+                                              
+filtered_water$result[fahrenheit] <- #filtered_water$result[...] references above array
+  (filtered_water$result[fahrenheit] - 32) * (5/9) ## overwriting F values with 
+                                                    ## C calculation
+
+filtered_water$unit[fahrenheit] <- 'Deg. Celsius'   ## classifying as C                                
+
+summary(filtered_water) ## worked! now to drop F from summary
+
+filtered_water <- filtered_water %>% 
+  mutate(unit=droplevels(unit))
+
+summary(filtered_water)
+
+## Plotting
+
+ggplot(filtered_water, mapping = aes(sampleDate, result))+
+  geom_point() ## outlier with temperature above 1000000
+
+filter(filtered_water, result > 1000000)
+
+filtered_water <- filtered_water %>% 
+  filter(result <= 1000000)
+
+summary(filtered_water) ## showing temp results over 1000...very unlikely)
+        
+filtered_water <- filtered_water %>% 
+  filter(result <= 1000)
+
+summary(filtered_water) ## looks more reasonable!
+
+ggplot(filtered_water, mapping = aes(sampleDate, result))+
+  geom_point()
+
+ggplot(filtered_water, mapping = aes(unit,result))+
+  geom_boxplot()
+
+## Pivot! Pivot!
+##  we no longer need parameter Type or Unit as we are in basic units and have done
+##  all of our filtering for pH and water temp values
+
+filtered_water <- filtered_water %>% 
+  select(-paramType,-unit)
+
+summary(filtered_water)
+
+filtered_water_w  <-pivot_wider(filtered_water,
+                                names_from = parameter, 
+                                values_from = result) 
+## error! R found duplicate records that would take the same rows
+
+duplicates <- filtered_water[,-5] ## tibble excluding last column `result`
+
+duplicated(duplicates) ## gives vector of TRUE and FALSE
+
+dupes <- which(duplicated(duplicates)) ## assign vector to tibble
+
+filtered_water <- filtered_water[-dupes,] ## drop duplicated items
+
+filtered_water_w  <-pivot_wider(filtered_water,
+                                names_from = parameter, 
+                                values_from = result) 
+filtered_water_w
+
+filtered_water_w <- filtered_water_w %>% 
+  rename(pH=PH, temperature=`WATER TEMPERATURE`)
+
+summary(filtered_water_w)
+
+## exploratory visualizations - Guided project ended above
+
+ggplot(filtered_water_w, mapping = aes(siteType,temperature))+
+  geom_boxplot()+
+  labs(title ='Temperature by Site Type',
+       x = 'Site Type',
+       y= 'Temperature')
+
+ggplot(filtered_water_w, mapping = aes(temperature, color = siteType))+
+  geom_histogram()
